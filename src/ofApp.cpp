@@ -5,9 +5,11 @@ class ofApp : public ofBaseApp {
     ofShader renderShader, feedbackShader;
     GLuint FeedbackPositionAtt, RenderPositionAtt;
     
-    GLuint TransformVAO = 0, TransformVBO = 0;
-    GLuint FeedbackVAO = 0, FeedbackVBO = 0;
     GLuint TransformFeedback = 0;
+    
+    ofBufferObject TFVbo[2];
+    ofVbo TFVao[2];
+    
     
     ofEasyCam camera;
     
@@ -22,56 +24,34 @@ class ofApp : public ofBaseApp {
         glTransformFeedbackVaryings(feedbackShader.getProgram(), 1, feedbackVaryings, GL_INTERLEAVED_ATTRIBS);
         feedbackShader.linkProgram();
         
-        FeedbackPositionAtt = glGetAttribLocation(feedbackShader.getProgram(), "position");
-        RenderPositionAtt = glGetAttribLocation(renderShader.getProgram(), "position");
+//        FeedbackPositionAtt = glGetAttribLocation(feedbackShader.getProgram(), "position");
+//        RenderPositionAtt = glGetAttribLocation(renderShader.getProgram(), "position");
 
         
-        GLfloat PositionData[] = {
-            50.0f, -50.0f, 0.0f,
-            -50.0f, -50.0f, 0.0f,
-            0.0f,  50.0f, 0.0f,
-        };
+        ofVec3f pos[3];
+        
+        pos[0] = ofVec3f(10.5f, -10.5f, 0.0f);
+        pos[1] = ofVec3f(-10.5f, -10.5f, 0.0f);
+        pos[2] = ofVec3f(0.0f,  10.5f, 0.0f);
         
         
-        //init buffers----------
-        glGenBuffers(1, &TransformVBO);
-        glBindBuffer(GL_ARRAY_BUFFER, TransformVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*9, PositionData, GL_STREAM_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        
-        glGenBuffers(1, &FeedbackVBO);
-        glBindBuffer(GL_ARRAY_BUFFER, FeedbackVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*9, nullptr, GL_STREAM_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        
-        
-        
-        
-        //init vertex array------
-        glGenVertexArrays(1, &TransformVAO);
-        glBindVertexArray(TransformVAO);
-            glBindBuffer(GL_ARRAY_BUFFER, TransformVBO);
-            glVertexAttribPointer(FeedbackPositionAtt, 3, GL_FLOAT, GL_FALSE, 0, 0);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
+        for(int i = 0; i < 2; i++)
+        {
+            TFVbo[i].allocate();
+            TFVbo[i].bind(GL_ARRAY_BUFFER);
+            TFVbo[i].setData(sizeof(ofVec3f) * 3, pos, GL_STATIC_DRAW);
+            TFVbo[i].unbind(GL_ARRAY_BUFFER);
             
-            glEnableVertexAttribArray(FeedbackPositionAtt);
-        glBindVertexArray(0);
-        
-        
-        glGenVertexArrays(1, &FeedbackVAO);
-        glBindVertexArray(FeedbackVAO);
-            glBindBuffer(GL_ARRAY_BUFFER, FeedbackVBO);
-            glVertexAttribPointer(RenderPositionAtt, 3, GL_FLOAT, GL_FALSE, 0, 0);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
-            
-            glEnableVertexAttribArray(RenderPositionAtt);
-        glBindVertexArray(0);
+            TFVao[i].bind();
+            TFVao[i].setVertexBuffer(TFVbo[i], 3, sizeof(ofVec3f), 0);
+            TFVao[i].unbind();
+        }
         
         
         //init TF object------
         glGenTransformFeedbacks(1, &TransformFeedback);
         glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, TransformFeedback);
-        glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, FeedbackVBO);
+        glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, TFVbo[1].getId());
         glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, 0);
         
     }
@@ -83,11 +63,11 @@ class ofApp : public ofBaseApp {
         
         glEnable(GL_RASTERIZER_DISCARD);
         feedbackShader.begin();
-        glBindVertexArray(TransformVAO);
+        feedbackShader.setUniform1f("u_time", ofGetElapsedTimef());
         glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, TransformFeedback);
-        glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, FeedbackVBO);
+        glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, TFVbo[1].getId());
         glBeginTransformFeedback(GL_TRIANGLES);
-            glDrawArraysInstanced(GL_TRIANGLES, 0, 3, 1);
+            TFVao[0].draw(GL_TRIANGLES, 0, 3);
         glEndTransformFeedback();
         glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, 0);
         feedbackShader.end();
@@ -102,19 +82,17 @@ class ofApp : public ofBaseApp {
         
         glEnable(GL_DEPTH_TEST);
         
-        glClearColor(0.0, 0.6, 0.1, 1.0);
+        glClearColor(0.0, 0.3, 0.3, 1.0);
         glClear(GL_COLOR_BUFFER_BIT);
         
         
         camera.begin();
         renderShader.begin();
-        glBindVertexArray(FeedbackVAO);
+        TFVao[1].bind();
         glDrawTransformFeedback(GL_TRIANGLES, TransformFeedback);
+        TFVao[1].unbind();
         renderShader.end();
         camera.end();
-        
-        
-        swap(TransformVBO, FeedbackVBO);
     }
     
     
