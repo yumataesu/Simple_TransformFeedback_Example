@@ -98,10 +98,6 @@ class ofApp : public ofBaseApp {
     
     void exit()
     {
-        glDeleteVertexArrays(1, &TransformVAO);
-        glDeleteBuffers(1, &TransformVBO);
-        glDeleteVertexArrays(1, &FeedbackVAO);
-        glDeleteBuffers(1, &FeedbackVBO);
         glDeleteTransformFeedbacks(1, &TransformFeedback);
 
     }
