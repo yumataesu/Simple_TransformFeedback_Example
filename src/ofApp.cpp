@@ -9,12 +9,18 @@ class ofApp : public ofBaseApp {
     
     ofEasyCam camera;
     
-    static const int NUM = 1000000;
+    
+    ofBufferObject TransformBuffer, FeedbackBuffer;
+    ofVbo TransformVertexBuffer, FeedbackVertexBuffer;
+    
+    
+    static const int NUM = 400000;
     struct Particle
     {
         ofVec3f position;
         ofVec3f accel;
         ofVec3f velocity;
+        float lifetime;
     };
     
     Particle particle[NUM];
@@ -26,17 +32,19 @@ class ofApp : public ofBaseApp {
         renderShader.load("shaders/render.vert", "shaders/render.frag");
         
         feedbackShader.setupShaderFromFile(GL_VERTEX_SHADER, "shaders/feedback.vert");
-        const GLchar* feedbackVaryings[] = { "o_position", "o_accel", "o_velocity" };
-        glTransformFeedbackVaryings(feedbackShader.getProgram(), 3, feedbackVaryings, GL_INTERLEAVED_ATTRIBS);
+        feedbackShader.setupShaderFromFile(GL_GEOMETRY_SHADER_EXT, "shaders/feedback.geom");
+        const GLchar* feedbackVaryings[] = { "o_position", "o_accel", "o_velocity", "o_lifetime" };
+        glTransformFeedbackVaryings(feedbackShader.getProgram(), 4, feedbackVaryings, GL_INTERLEAVED_ATTRIBS);
         feedbackShader.linkProgram();
 
         
         
         for(int i = 0; i < NUM; i++)
         {
-            particle[i].position = ofVec3f(ofRandom(-100, 100), ofRandom(-100, 100), ofRandom(-100, 100));
+            particle[i].position = ofVec3f(ofRandom(-500, 500), ofRandom(-500, 500), ofRandom(-500, 500));
             particle[i].accel = ofVec3f(ofRandom(-1, 1), ofRandom(-1, 1), ofRandom(-1, 1));
             particle[i].velocity = ofVec3f(ofRandom(-1, 1), ofRandom(-1, 1), ofRandom(-1, 1));
+            particle[i].lifetime = ofRandom(0, 10);
         }
         
         
@@ -52,6 +60,32 @@ class ofApp : public ofBaseApp {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         
         
+//        TransformBuffer.allocate();
+//        TransformBuffer.bind(GL_ARRAY_BUFFER);
+//        TransformBuffer.setData(sizeof(Particle) * NUM, particle, GL_STREAM_COPY);
+//        TransformBuffer.unbind(GL_ARRAY_BUFFER);
+//        
+//        FeedbackBuffer.allocate();
+//        FeedbackBuffer.bind(GL_ARRAY_BUFFER);
+//        FeedbackBuffer.setData(sizeof(Particle) * NUM, nullptr, GL_STREAM_COPY);
+//        FeedbackBuffer.unbind(GL_ARRAY_BUFFER);
+//        
+//        
+//        
+//        TransformVertexBuffer.bind();
+//        TransformVertexBuffer.setAttributeBuffer(0, TransformBuffer, 3, sizeof(Particle), 0);
+//        TransformVertexBuffer.setAttributeBuffer(1, TransformBuffer, 3, sizeof(Particle), 12);
+//        TransformVertexBuffer.setAttributeBuffer(2, TransformBuffer, 3, sizeof(Particle), 24);
+//        TransformVertexBuffer.unbind();
+//        
+//        
+//        FeedbackVertexBuffer.bind();
+//        FeedbackVertexBuffer.setAttributeBuffer(0, TransformBuffer, 3, sizeof(Particle), 0);
+//        FeedbackVertexBuffer.setAttributeBuffer(1, TransformBuffer, 3, sizeof(Particle), 12);
+//        FeedbackVertexBuffer.setAttributeBuffer(2, TransformBuffer, 3, sizeof(Particle), 24);
+//        FeedbackVertexBuffer.unbind();
+        
+        
         
         
         glGenVertexArrays(1, &TransformVao);
@@ -61,9 +95,11 @@ class ofApp : public ofBaseApp {
         glEnableVertexAttribArray(0);
         glEnableVertexAttribArray(1);
         glEnableVertexAttribArray(2);
+        glEnableVertexAttribArray(3);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Particle), (GLvoid*)(0 * sizeof(GLfloat)));
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Particle), (GLvoid*)(3 * sizeof(GLfloat)));
         glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Particle), (GLvoid*)(6 * sizeof(GLfloat)));
+        glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(Particle), (GLvoid*)(9 * sizeof(GLfloat)));
         
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
@@ -77,9 +113,11 @@ class ofApp : public ofBaseApp {
         glEnableVertexAttribArray(0);
         glEnableVertexAttribArray(1);
         glEnableVertexAttribArray(2);
+        glEnableVertexAttribArray(3);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Particle), (GLvoid*)(0 * sizeof(GLfloat)));
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Particle), (GLvoid*)(3 * sizeof(GLfloat)));
         glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Particle), (GLvoid*)(6 * sizeof(GLfloat)));
+        glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(Particle), (GLvoid*)(9 * sizeof(GLfloat)));
         
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
@@ -91,6 +129,15 @@ class ofApp : public ofBaseApp {
         glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, FeedbackVbo);
         glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, 0);
         
+        
+        
+            //init TF object------
+//            glGenTransformFeedbacks(1, &TransformFeedback);
+//            glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, TransformFeedback);
+//            glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, FeedbackBuffer.getId());
+//            glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, 0);
+
+        
     }
     
     
@@ -98,9 +145,12 @@ class ofApp : public ofBaseApp {
     void update()
     {
         
+        float time = ofGetElapsedTimef();
+        //camera.orbit(50 * time, 0, 2000);
+        
         glEnable(GL_RASTERIZER_DISCARD);
         feedbackShader.begin();
-        feedbackShader.setUniform1f("u_time", ofGetElapsedTimef());
+        feedbackShader.setUniform1f("u_time", time);
         
         glBindVertexArray(TransformVao);
         
@@ -108,15 +158,35 @@ class ofApp : public ofBaseApp {
         glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, FeedbackVbo);
         
         glBeginTransformFeedback(GL_POINTS);
-            glDrawArrays(GL_POINTS, 0, NUM);
+            glDrawArraysInstanced(GL_POINTS, 0, NUM, 1);
         glEndTransformFeedback();
         glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, 0);
         
         feedbackShader.end();
         glDisable(GL_RASTERIZER_DISCARD);
+        
+        
+//        glEnable(GL_RASTERIZER_DISCARD);
+//        feedbackShader.begin();
+//        feedbackShader.setUniform1f("u_time", ofGetElapsedTimef());
+//        
+//        //glBindVertexArray(TransformVao);
+//        
+//        
+//        glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, TransformFeedback);
+//        glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, FeedbackBuffer.getId());
+//        
+//        glBeginTransformFeedback(GL_POINTS);
+//        //glDrawArraysInstanced(GL_POINTS, 0, NUM, 1);
+//        
+//        TransformVertexBuffer.drawInstanced(GL_POINTS, 0, NUM, 1);
+//        glEndTransformFeedback();
+//        glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, 0);
+//        
+//        feedbackShader.end();
+//        glDisable(GL_RASTERIZER_DISCARD);
 
-        
-        
+
     }
     
     
@@ -133,9 +203,13 @@ class ofApp : public ofBaseApp {
         camera.begin();
         renderShader.begin();
         glBindVertexArray(FeedbackVao);
+        //TransformVertexBuffer.bind();
+        glBindVertexArray(FeedbackVao);
         glDrawTransformFeedback(GL_POINTS, TransformFeedback);
+        //TransformVertexBuffer.unbind();
         renderShader.end();
         camera.end();
+        
         
         
         std::swap(TransformVbo, FeedbackVbo);
@@ -170,8 +244,8 @@ int main(){
     
     ofGLFWWindowSettings settings;
     settings.setGLVersion(4, 0);
-    settings.width = 640;
-    settings.height = 360;
+    settings.width = 1280;
+    settings.height = 720;
     settings.resizable = false;
     ofCreateWindow(settings);
     
