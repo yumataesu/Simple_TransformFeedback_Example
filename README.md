@@ -1,3 +1,4 @@
 # Simple TransformFeedback Example
  
-a triangle moves to right continually, using Transform Feedback
+![ss](https://github.com/yumataesu/Simple_TransformFeedback_Example/blob/master/TF02.gif)
+![ss](https://github.com/yumataesu/Simple_TransformFeedback_Example/blob/master/TF04.gif)
