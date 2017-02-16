@@ -14,16 +14,19 @@ class ofApp : public ofBaseApp {
     ofVbo TransformVertexBuffer, FeedbackVertexBuffer;
     
     
-    static const int NUM = 400000;
+    static const int NUM = 50000;
     struct Particle
     {
         ofVec3f position;
         ofVec3f accel;
         ofVec3f velocity;
         float lifetime;
+        ofVec3f color;
     };
     
     Particle particle[NUM];
+    ofTexture texture;
+    
     
     //--------------------------------------------------------------
     void setup()
@@ -33,10 +36,17 @@ class ofApp : public ofBaseApp {
         
         feedbackShader.setupShaderFromFile(GL_VERTEX_SHADER, "shaders/feedback.vert");
         feedbackShader.setupShaderFromFile(GL_GEOMETRY_SHADER_EXT, "shaders/feedback.geom");
-        const GLchar* feedbackVaryings[] = { "o_position", "o_accel", "o_velocity", "o_lifetime" };
-        glTransformFeedbackVaryings(feedbackShader.getProgram(), 4, feedbackVaryings, GL_INTERLEAVED_ATTRIBS);
+        const GLchar* feedbackVaryings[] = { "o_position", "o_accel", "o_velocity", "o_lifetime", "o_color" };
+        glTransformFeedbackVaryings(feedbackShader.getProgram(), 5, feedbackVaryings, GL_INTERLEAVED_ATTRIBS);
         feedbackShader.linkProgram();
-
+        
+        ofDisableArbTex();
+        ofLoadImage(texture, "tex/dot.png");
+        ofEnableArbTex();
+        
+        renderShader.begin();
+        renderShader.setUniformTexture("tex", texture, 0);
+        renderShader.end();
         
         
         for(int i = 0; i < NUM; i++)
@@ -45,18 +55,19 @@ class ofApp : public ofBaseApp {
             particle[i].accel = ofVec3f(ofRandom(-1, 1), ofRandom(-1, 1), ofRandom(-1, 1));
             particle[i].velocity = ofVec3f(ofRandom(-1, 1), ofRandom(-1, 1), ofRandom(-1, 1));
             particle[i].lifetime = ofRandom(0, 10);
+            particle[i].color = ofVec3f(ofRandom(0, 1), ofRandom(0, 1), ofRandom(0, 1));
         }
         
         
         glGenBuffers(1, &TransformVbo);
         
         glBindBuffer(GL_ARRAY_BUFFER, TransformVbo);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(Particle) * NUM, particle, GL_STREAM_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(Particle) * NUM, particle, GL_STREAM_COPY);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         
         glGenBuffers(1, &FeedbackVbo);
         glBindBuffer(GL_ARRAY_BUFFER, FeedbackVbo);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(Particle) * NUM, nullptr, GL_STREAM_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(Particle) * NUM, nullptr, GL_STREAM_COPY);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         
         
@@ -96,10 +107,12 @@ class ofApp : public ofBaseApp {
         glEnableVertexAttribArray(1);
         glEnableVertexAttribArray(2);
         glEnableVertexAttribArray(3);
+        glEnableVertexAttribArray(4);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Particle), (GLvoid*)(0 * sizeof(GLfloat)));
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Particle), (GLvoid*)(3 * sizeof(GLfloat)));
         glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Particle), (GLvoid*)(6 * sizeof(GLfloat)));
         glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(Particle), (GLvoid*)(9 * sizeof(GLfloat)));
+        glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Particle), (GLvoid*)(10 * sizeof(GLfloat)));
         
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
@@ -114,10 +127,12 @@ class ofApp : public ofBaseApp {
         glEnableVertexAttribArray(1);
         glEnableVertexAttribArray(2);
         glEnableVertexAttribArray(3);
+        glEnableVertexAttribArray(4);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Particle), (GLvoid*)(0 * sizeof(GLfloat)));
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Particle), (GLvoid*)(3 * sizeof(GLfloat)));
         glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Particle), (GLvoid*)(6 * sizeof(GLfloat)));
         glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(Particle), (GLvoid*)(9 * sizeof(GLfloat)));
+        glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Particle), (GLvoid*)(10 * sizeof(GLfloat)));
         
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
@@ -136,8 +151,9 @@ class ofApp : public ofBaseApp {
 //            glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, TransformFeedback);
 //            glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, FeedbackBuffer.getId());
 //            glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, 0);
-
         
+        ofEnableAlphaBlending();
+        ofEnableBlendMode(OF_BLENDMODE_ADD);
     }
     
     
@@ -162,8 +178,9 @@ class ofApp : public ofBaseApp {
         glEndTransformFeedback();
         glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, 0);
         
-        feedbackShader.end();
         glDisable(GL_RASTERIZER_DISCARD);
+        feedbackShader.end();
+        
         
         
 //        glEnable(GL_RASTERIZER_DISCARD);
@@ -193,23 +210,28 @@ class ofApp : public ofBaseApp {
     //--------------------------------------------------------------
     void draw()
     {
-        
-        glEnable(GL_DEPTH_TEST);
+        //glEnable(GL_DEPTH_TEST);
         
         glClearColor(0.0, 0.0, 0.0, 1.0);
         glClear(GL_COLOR_BUFFER_BIT);
         
+
+        
         
         camera.begin();
+        glEnable(GL_POINT_SPRITE);
+        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+        
         renderShader.begin();
-        glBindVertexArray(FeedbackVao);
-        //TransformVertexBuffer.bind();
+
+//        ofEnablePointSprites();
+        
         glBindVertexArray(FeedbackVao);
         glDrawTransformFeedback(GL_POINTS, TransformFeedback);
-        //TransformVertexBuffer.unbind();
+
         renderShader.end();
+//        ofDisablePointSprites();
         camera.end();
-        
         
         
         std::swap(TransformVbo, FeedbackVbo);

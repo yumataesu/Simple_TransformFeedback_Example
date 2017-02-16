@@ -6,12 +6,14 @@ layout(location = 0) in vec3 in_position;
 layout(location = 1) in vec3 in_accel;
 layout(location = 2) in vec3 in_velocity;
 layout(location = 3) in float in_lifetime;
+layout(location = 4) in vec3 in_color;
 
 
 out vec3 v_position;
 out vec3 v_accel;
 out vec3 v_velocity;
 out float v_lifetime;
+out vec3 v_color;
 
 
 void main() {
@@ -20,7 +22,7 @@ void main() {
     vec3 velocity = in_velocity;
     float lifetime = in_lifetime;
 
-    accel = normalize(vec3(40.0 * cos(u_time * 3.0), 5.0*sin(u_time), 90.0 * cos(u_time * 5.0)) - position);
+    accel = normalize(vec3(140.0 * cos(u_time * 3.0), 5.0*sin(u_time), 90.0 * cos(u_time * 5.0)) - position);
     velocity += accel;
     position += velocity;
     
@@ -32,11 +34,11 @@ void main() {
         lifetime = 100.0;
     }
     
-    lifetime -= 0.5;
+    lifetime -= 0.1;
     
     v_position = position;
     v_accel = accel;
     v_velocity = velocity;
     v_lifetime = lifetime;
-    
+    v_color = accel;
 }
